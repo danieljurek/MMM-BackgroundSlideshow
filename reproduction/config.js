@@ -1,4 +1,6 @@
-const config = {
+// MagicMirror merges its defaults by reassigning this global.
+// eslint-disable-next-line prefer-const
+let config = {
   address: 'localhost',
   port: 8080,
   basePath: '/',
