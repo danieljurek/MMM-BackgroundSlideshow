@@ -92,6 +92,10 @@ export default defineConfig([
     }
   },
   {
+    'files': ['reproduction/config.js'],
+    'rules': {'prefer-const': 'off'}
+  },
+  {
     'files': ['**/*.md'],
     'plugins': {markdown},
     'extends': ['markdown/recommended'],

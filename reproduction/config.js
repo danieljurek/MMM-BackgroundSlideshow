@@ -1,5 +1,4 @@
-// MagicMirror merges its defaults by reassigning this global.
-// eslint-disable-next-line prefer-const
+// MagicMirror expects this global to remain mutable while it merges defaults.
 let config = {
   address: 'localhost',
   port: 8080,
