@@ -15,7 +15,8 @@ let config = {
       position: 'fullscreen_below',
       config: {
         imagePaths: ['/tmp/mmm-backgroundslideshow-repro-images'],
-        slideshowSpeed: 2000,
+        // Accelerated to make the retained image transport visible quickly.
+        slideshowSpeed: 250,
         randomizeImageOrder: false,
         recursiveSubDirectories: false,
         transitionImages: false,
