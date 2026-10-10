@@ -472,14 +472,28 @@ Module.register('MMM-BackgroundSlideshow', {
       this.playingVideo = false;
     }
 
+    const imageLoadId = (this.imageLoadId || 0) + 1;
+    this.imageLoadId = imageLoadId;
     const image = new Image();
-    image.onload = () => {
+    image.onerror = () => {
+      Log.warn(`[MMM-BackgroundSlideshow] Could not load image: ${imageinfo.path}`);
+    };
+    image.onload = async () => {
+      try {
+        if (typeof image.decode === 'function') {
+          await image.decode();
+        }
+      } catch (error) {
+        Log.warn(`[MMM-BackgroundSlideshow] Could not decode image: ${imageinfo.path}`, error);
+        return;
+      }
+      // A newer request may have arrived while this image was loading or decoding.
+      if (imageLoadId !== this.imageLoadId) {
+        return;
+      }
       // check if there are more than 2 elements and remove the first one
       if (this.imagesDiv.childNodes.length > 1) {
         this.imagesDiv.removeChild(this.imagesDiv.childNodes[0]);
-      }
-      if (this.imagesDiv.childNodes.length > 0) {
-        this.imagesDiv.childNodes[0].style.opacity = '0';
       }
 
       const transitionDiv = document.createElement('div');
@@ -513,10 +527,6 @@ Module.register('MMM-BackgroundSlideshow', {
 
       const imageDiv = this.createDiv();
       imageDiv.style.backgroundImage = `url("${image.src}")`;
-      // imageDiv.style.transform = 'rotate(0deg)';
-
-      // this.div1.style.backgroundImage = `url("${image.src}")`;
-      // this.div1.style.opacity = '1';
 
       if (this.config.showProgressBar) {
         // Restart css animation
@@ -592,12 +602,40 @@ Module.register('MMM-BackgroundSlideshow', {
       foregroundDiv.appendChild(imageDiv);
       transitionDiv.appendChild(foregroundDiv);
       this.imagesDiv.appendChild(transitionDiv);
+      this.finishImageSwap(transitionDiv, foregroundDiv);
+      this.sendSocketNotification('BACKGROUNDSLIDESHOW_IMAGE_UPDATED', {
+        url: imageinfo.path
+      });
     };
 
     image.src = imageinfo.data;
-    this.sendSocketNotification('BACKGROUNDSLIDESHOW_IMAGE_UPDATED', {
-      url: imageinfo.path
-    });
+  },
+
+  finishImageSwap (transitionDiv, foregroundDiv) {
+    const previousSlide = transitionDiv.previousElementSibling;
+    if (!previousSlide) {
+      return;
+    }
+    const animationElement = foregroundDiv.style.animationName
+      ? foregroundDiv
+      : transitionDiv;
+    const removePreviousSlide = () => {
+      previousSlide.remove();
+    };
+    if (animationElement.style.animationName) {
+      const onAnimationEnd = (event) => {
+        if (event.target === animationElement) {
+          removePreviousSlide();
+          animationElement.removeEventListener('animationend', onAnimationEnd);
+        }
+      };
+      animationElement.addEventListener('animationend', onAnimationEnd);
+    } else {
+      // Keep the old slide underneath for a rendering opportunity before removing it.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(removePreviousSlide);
+      });
+    }
   },
 
   updateImage (backToPreviousImage = false, imageToDisplay = null) {
