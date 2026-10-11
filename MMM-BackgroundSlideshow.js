@@ -427,20 +427,36 @@ Module.register('MMM-BackgroundSlideshow', {
     wrapper.appendChild(div);
   },
 
-  createDiv () {
-    const div = document.createElement('div');
-    div.style.backgroundSize = this.config.backgroundSize;
-    div.style.backgroundPosition = this.config.backgroundPosition;
-    div.className = 'image';
-    return div;
+  createDiv (image) {
+    image.style.objectFit = this.config.backgroundSize === 'contain'
+      ? 'contain'
+      : 'cover';
+    image.style.objectPosition = this.config.backgroundPosition;
+    image.className = 'image';
+    image.alt = '';
+    return image;
   },
 
-  createBlurredBackgroundDiv () {
-    const div = document.createElement('div');
-    div.style.backgroundSize = 'cover';
-    div.style.backgroundPosition = 'center';
-    div.className = 'image image-background';
-    return div;
+  createBlurredBackgroundDiv (image) {
+    image.style.objectFit = 'cover';
+    image.style.objectPosition = 'center';
+    image.className = 'image image-background';
+    image.alt = '';
+    return image;
+  },
+
+  async decodeImage (image) {
+    if (typeof image.decode === 'function') {
+      await image.decode();
+    } else if (!image.complete) {
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+      });
+    }
+    if (!image.naturalWidth) {
+      throw new Error('Image has no decoded pixels');
+    }
   },
 
   createImageInfoDiv (wrapper) {
@@ -479,9 +495,12 @@ Module.register('MMM-BackgroundSlideshow', {
       Log.warn(`[MMM-BackgroundSlideshow] Could not load image: ${imageinfo.path}`);
     };
     image.onload = async () => {
+      let backgroundImage;
       try {
-        if (typeof image.decode === 'function') {
-          await image.decode();
+        await this.decodeImage(image);
+        if (this.config.backgroundBlurEnabled) {
+          backgroundImage = image.cloneNode();
+          await this.decodeImage(backgroundImage);
         }
       } catch (error) {
         Log.warn(`[MMM-BackgroundSlideshow] Could not decode image: ${imageinfo.path}`, error);
@@ -491,7 +510,6 @@ Module.register('MMM-BackgroundSlideshow', {
       if (imageLoadId !== this.imageLoadId) {
         return;
       }
-      // check if there are more than 2 elements and remove the first one
       if (this.imagesDiv.childNodes.length > 1) {
         this.imagesDiv.removeChild(this.imagesDiv.childNodes[0]);
       }
@@ -512,9 +530,8 @@ Module.register('MMM-BackgroundSlideshow', {
       }
 
       let backgroundDiv;
-      if (this.config.backgroundBlurEnabled) {
-        backgroundDiv = this.createBlurredBackgroundDiv();
-        backgroundDiv.style.backgroundImage = `url("${image.src}")`;
+      if (backgroundImage) {
+        backgroundDiv = this.createBlurredBackgroundDiv(backgroundImage);
       }
 
       const foregroundDiv = document.createElement('div');
@@ -525,8 +542,8 @@ Module.register('MMM-BackgroundSlideshow', {
         foregroundDiv.style.animationTimingFunction = this.config.transitionTimingFunction;
       }
 
-      const imageDiv = this.createDiv();
-      imageDiv.style.backgroundImage = `url("${image.src}")`;
+      // Display the same element we decoded; CSS backgrounds can load separately.
+      const imageDiv = this.createDiv(image);
 
       if (this.config.showProgressBar) {
         // Restart css animation
@@ -553,9 +570,9 @@ Module.register('MMM-BackgroundSlideshow', {
           const adjustedWidth = width * window.innerHeight / height;
           const adjustedHeight = height * window.innerWidth / width;
 
-          imageDiv.style.backgroundPosition = '';
+          imageDiv.style.objectPosition = '';
           imageDiv.style.animationIterationCount = this.config.backgroundAnimationLoopCount;
-          imageDiv.style.backgroundSize = 'cover';
+          imageDiv.style.objectFit = 'cover';
 
           if (
             adjustedWidth / window.innerWidth >
@@ -583,7 +600,6 @@ Module.register('MMM-BackgroundSlideshow', {
       EXIF.getData(image, () => {
         if (this.config.showImageInfo) {
           let dateTime = EXIF.getTag(image, 'DateTimeOriginal');
-          // attempt to parse the date if possible
           if (dateTime !== null) {
             dateTime = this.formatImageInfoDate(dateTime);
           }

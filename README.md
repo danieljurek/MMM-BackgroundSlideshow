@@ -59,6 +59,18 @@ body {
 }
 ```
 
+## Image loading
+
+Photos and blurred backdrops are displayed as image elements. Both are loaded
+and decoded before the slide is added. The previous slide stays visible while
+the next image loads; a loading or decoding error leaves the previous photo
+on screen. Browsers without `decode()` support wait for the image load event.
+
+The `backgroundSize` and `backgroundPosition` settings still control fitting
+and placement. Custom styles that previously set `background-size` or
+`background-position` on `.image` should now use `object-fit` or
+`object-position` instead.
+
 ## Update
 
 To update the module, go to the module directory, pull the latest changes, and install any new dependencies:
